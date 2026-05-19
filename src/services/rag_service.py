@@ -87,6 +87,14 @@ def _service_slug_for_query(query: str) -> str | None:
     return None
 
 
+def is_service_overview(question: str) -> bool:
+    return _is_service_overview(question)
+
+
+def service_slug_for_query(query: str) -> str | None:
+    return _service_slug_for_query(query)
+
+
 class RAGService:
     """Retrieve relevant chunks and generate grounded responses."""
 
@@ -159,7 +167,7 @@ class RAGService:
         # "tell me more"), and explicit questions alike. Falls back to the
         # raw user message if the call fails or returns empty output.
         retrieval_query = (
-            self._llm_service.rewrite_query(question, history) or question
+            await self._llm_service.rewrite_query(question, history) or question
         )
         LOGGER.info("[RAG] retrieval query: %r", retrieval_query)
 

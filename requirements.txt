@@ -9,6 +9,8 @@ pydantic-settings==2.10.1
 # HTTP client
 requests==2.33.0
 httpx==0.27.0
+langgraph>=0.2,<0.3
+langchain-core>=0.3,<0.4
 
 # Vector store
 pgvector==0.3.6

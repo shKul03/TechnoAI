@@ -26,6 +26,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
+LOGGER = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -34,8 +35,13 @@ async def lifespan(_: FastAPI):
 
     settings = get_settings()
     get_vector_store().initialize(vector_size=settings.embedding_dimensions)
+    from src.graph.graph import initialise_graph
+    await initialise_graph(get_settings().database_url)
+    LOGGER.info("[startup] LangGraph graph ready")
     Scheduler().start()
     yield
+    from src.graph.graph import shutdown_graph
+    await shutdown_graph()
 
 
 def create_app() -> FastAPI:

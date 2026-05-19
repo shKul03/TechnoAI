@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src.dependencies import get_rag_service
+from langchain_core.runnables import RunnableConfig
+from src.graph.state import ChatState
 from src.limiter import limiter
 from src.services import chat_memory
+from src.services.rag_service import FALLBACK_RESPONSE
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -36,31 +39,49 @@ class ChatResponse(BaseModel):
 async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     """Answer a question using the RAG pipeline, with optional session memory."""
 
-    LOGGER.info("[chat] incoming session_id=%r", payload.session_id)
-    session_id = chat_memory.get_or_create_session(payload.session_id)
-    history = chat_memory.get_history(session_id)
-    LOGGER.info("[chat] resolved session_id=%s  history_len=%d", session_id, len(history))
+    session_id = payload.session_id or str(uuid.uuid4())
+
+    initial_state: ChatState = {
+        "question": payload.question,
+        "session_id": session_id,
+        "intent": "general",
+        "route": "semantic",
+        "retrieval_query": "",
+        "service_slug": None,
+        "chunks": [],
+        "context": "",
+        "sources": [],
+        "answer": "",
+        "follow_ups": [],
+    }
+
+    config = RunnableConfig(
+        configurable={"thread_id": session_id}
+    )
 
     try:
-        rag_service = get_rag_service()
-        result = await rag_service.answer(
-            question=payload.question,
-            chat_history=history or None,
+        from src.graph import graph as graph_module
+        if graph_module.chat_graph is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Service starting up. Please retry."
+            )
+        result = await graph_module.chat_graph.ainvoke(
+            initial_state,
+            config=config,
         )
-    except Exception as exc:  # pragma: no cover - defensive API boundary
-        LOGGER.exception("Chat request failed")
+        return ChatResponse(
+            answer=result.get("answer") or FALLBACK_RESPONSE,
+            sources=result.get("sources", []),
+            session_id=session_id,
+            follow_ups=result.get("follow_ups", []),
+        )
+    except Exception as exc:
+        LOGGER.exception("Chat graph invocation failed")
         raise HTTPException(
             status_code=500,
             detail="Something went wrong. Please try again.",
         ) from exc
-
-    chat_memory.append_turn(session_id, payload.question, result["answer"])
-    return ChatResponse(
-        answer=result["answer"],
-        sources=result["sources"],
-        session_id=session_id,
-        follow_ups=result.get("follow_ups", []),
-    )
 
 
 @router.delete("/session/{session_id}", tags=["chat"])

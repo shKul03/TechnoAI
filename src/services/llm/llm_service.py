@@ -6,7 +6,6 @@ import json
 import logging
 
 import httpx
-import requests
 
 LOGGER = logging.getLogger(__name__)
 
@@ -204,7 +203,7 @@ class LLMService:
             LOGGER.warning("[LLM] follow_ups generation failed: %s", exc)
             return []
 
-    def rewrite_query(self, question: str, chat_history: list[str]) -> str | None:
+    async def rewrite_query(self, question: str, chat_history: list[str]) -> str | None:
         """Rewrite a vague follow-up into a standalone search query.
 
         Returns a short query string, or None if the call fails or returns empty.
@@ -236,19 +235,20 @@ class LLMService:
         )
 
         try:
-            response = requests.post(
-                f"{self._base_url}/api/generate",
-                json={
-                    "model": self._rewrite_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.0,
-                        "num_predict": 50,
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self._base_url}/api/generate",
+                    json={
+                        "model": self._rewrite_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.0,
+                            "num_predict": 50,
+                        },
                     },
-                },
-                timeout=30,
-            )
+                    timeout=30,
+                )
             response.raise_for_status()
             result = response.json().get("response", "").strip()
             # Take only the first line and strip stray quotes/backticks

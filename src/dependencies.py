@@ -8,6 +8,7 @@ from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.ingestion.file_ingestor import FileIngestor
 from src.services.ingestion.pipeline import IngestionPipeline
 from src.services.ingestion.website_ingestor import WebsiteIngestor
+from src.services import chat_memory as _chat_memory_module
 from src.services.llm.llm_service import LLMService
 from src.services.rag_service import RAGService
 from src.services.vector_store.base import VectorStore
@@ -66,6 +67,11 @@ def get_rag_service() -> RAGService:
         retrieval_top_k=settings.retrieval_top_k,
         retrieval_min_score=settings.retrieval_min_score,
     )
+
+
+def get_chat_memory():
+    """Return the chat memory module for use in graph nodes."""
+    return _chat_memory_module
 
 
 def get_ingestion_pipeline() -> IngestionPipeline:
