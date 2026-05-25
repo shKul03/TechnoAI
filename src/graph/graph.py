@@ -14,7 +14,6 @@ from src.graph.nodes import (
     semantic_retrieve,
     score_gate,
     llm_answer,
-    contact_response,
     closure_response,
     save_session,
 )
@@ -53,7 +52,6 @@ def _build_graph_definition() -> StateGraph:
     graph.add_node("semantic_retrieve", semantic_retrieve)
     graph.add_node("score_gate",        score_gate)
     graph.add_node("llm_answer",        llm_answer)
-    graph.add_node("contact_response",  contact_response)
     graph.add_node("closure_response",  closure_response)
     graph.add_node("save_session",      save_session)
 
@@ -65,7 +63,6 @@ def _build_graph_definition() -> StateGraph:
         _route_intent,
         {
             "overview": "fetch_overview",
-            "contact":  "contact_response",
             "closure":  "closure_response",
             "general":  "rewrite_query",
         },
@@ -96,7 +93,6 @@ def _build_graph_definition() -> StateGraph:
     )
 
     graph.add_edge("llm_answer",       "save_session")
-    graph.add_edge("contact_response", "save_session")
     graph.add_edge("closure_response", "save_session")
     graph.add_edge("save_session",     END)
 
