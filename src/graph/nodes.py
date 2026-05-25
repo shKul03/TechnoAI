@@ -108,11 +108,11 @@ def fetch_overview(state: ChatState) -> dict:
 
     vector_store = get_vector_store()
     service_slugs = [
-        "products",
-        "carriers-products",
-        "broker-resources",
-        "newsroom",
-        "about",
+        "pages/products-services",
+        "pages/sleep-apnea",
+        "pages/oxygen-therapy",
+        "pages/mobility-home-equipment",
+        "pages/respiratory-care",
     ]
 
     def fetch_slug(slug: str):

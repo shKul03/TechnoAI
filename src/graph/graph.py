@@ -103,7 +103,7 @@ def _build_graph_definition() -> StateGraph:
     return graph
 
 
-async def initialise_graph(WB_DATABASE_URL: str) -> None:
+async def initialise_graph(database_url: str) -> None:
     """
     Compile the graph with AsyncPostgresSaver and store
     it in the module-level chat_graph reference.
@@ -121,7 +121,7 @@ async def initialise_graph(WB_DATABASE_URL: str) -> None:
     # because CREATE INDEX CONCURRENTLY cannot run inside
     # a transaction block (which the pool creates by default)
     async with await psycopg.AsyncConnection.connect(
-        WB_DATABASE_URL,
+        database_url,
         autocommit=True,
         row_factory=dict_row,
     ) as conn:
@@ -130,9 +130,9 @@ async def initialise_graph(WB_DATABASE_URL: str) -> None:
 
     # Now create the pool for runtime use
     pool: AsyncConnectionPool[psycopg.AsyncConnection[dict[str, Any]]] = AsyncConnectionPool(
-        conninfo=WB_DATABASE_URL,
+        conninfo=database_url,
         max_size=10,
-        min_size=1,
+        min_size=3,
         open=False,
         kwargs={
             "row_factory": dict_row,

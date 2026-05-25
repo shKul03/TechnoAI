@@ -34,7 +34,20 @@ class SitemapCrawler:
         self._browser: Optional[Browser] = None
 
     def discover_urls(self) -> list[str]:
-        """Resolve URLs from a sitemap or sitemap index."""
+        """Resolve URLs from a sitemap or sitemap index.
+
+        When manual_urls are configured they take priority and sitemap
+        discovery is skipped entirely. Sitemap discovery is only used
+        as a fallback when no manual_urls are provided.
+        """
+
+        if self._manual_urls.strip():
+            manual_urls = self._discover_manual_urls()
+            LOGGER.info(
+                "URL discovery mode: manual; discovered %s URLs",
+                len(manual_urls),
+            )
+            return manual_urls
 
         sitemap_urls = self._discover_sitemap_urls()
         if sitemap_urls:
@@ -44,16 +57,8 @@ class SitemapCrawler:
             )
             return sitemap_urls
 
-        manual_urls = self._discover_manual_urls()
-        if manual_urls:
-            LOGGER.info(
-                "URL discovery mode: manual_fallback; discovered %s URLs",
-                len(manual_urls),
-            )
-            return manual_urls
-
         raise ValueError(
-            "No valid sitemap URLs found and WB_WEBSITE_URLS is not configured."
+            "No valid sitemap URLs found and WEBSITE_URLS is not configured."
         )
 
     def fetch_page(self, url: str) -> str:

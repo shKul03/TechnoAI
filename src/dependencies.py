@@ -27,7 +27,7 @@ def get_vector_store() -> VectorStore:
     settings = get_settings()
     store_type = settings.vector_store_type.lower()
     if store_type == "pgvector":
-        return PGVectorStore(WB_DATABASE_URL=settings.WB_DATABASE_URL)
+        return PGVectorStore(WB_DATABASE_URL=settings.database_url)
     raise ValueError(
         f"Unsupported VECTOR_STORE_TYPE '{store_type}'. "
         "Set VECTOR_STORE_TYPE=pgvector in your .env file."
@@ -84,10 +84,10 @@ def get_ingestion_pipeline() -> IngestionPipeline:
     vector_store = get_vector_store()
     embedding_service = get_embedding_service()
     crawler = SitemapCrawler(
-        base_url=settings.WB_WEBSITE_URL,
+        base_url=settings.website_url,
         user_agent=settings.user_agent,
         timeout=settings.request_timeout_seconds,
-        manual_urls=settings.WB_WEBSITE_URLs,
+        manual_urls=settings.website_urls,
     )
     sources = [
         WebsiteIngestor(
@@ -96,7 +96,7 @@ def get_ingestion_pipeline() -> IngestionPipeline:
             vector_store=vector_store,
             chunk_size_words=settings.chunk_size_words,
             chunk_overlap_words=settings.chunk_overlap_words,
-            enabled=settings.enable_website_ingest and bool(settings.WB_WEBSITE_URL),
+            enabled=settings.enable_website_ingest and bool(settings.website_url),
         ),
         FileIngestor(
             embedding_service=embedding_service,

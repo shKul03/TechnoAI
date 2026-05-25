@@ -8,7 +8,7 @@ import sys
 from contextlib import asynccontextmanager
 
 if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     get_vector_store().initialize(vector_size=settings.embedding_dimensions)
     from src.graph.graph import initialise_graph
-    await initialise_graph(get_settings().WB_DATABASE_URL)
+    await initialise_graph(get_settings().database_url)
     LOGGER.info("[startup] LangGraph graph ready")
     Scheduler().start()
     yield

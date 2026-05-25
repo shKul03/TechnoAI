@@ -13,33 +13,39 @@ from src.services.vector_store.base import SearchResult, VectorStore
 LOGGER = logging.getLogger(__name__)
 
 FALLBACK_RESPONSE = (
-    "I can help with questions based on Word & Brown website content. "
-    "You can ask about our insurance services, broker resources, products, carriers, or how to get started."
+    "I can help with questions about AdaptHealth's home medical equipment and services. "
+    "You can ask about sleep therapy, oxygen therapy, respiratory care, mobility equipment, "
+    "diabetes supplies, wound care, specialty care, or how to get started as a patient."
 )
 
 # Canonical service list — deterministic, so the answer is always consistent
 # and follow-up ordinal resolution works reliably.
 _CANONICAL_SERVICES = [
-    "AI Business Transformation",
-    "Cloud & Product Modernization",
-    "Data Intelligence & Analytics",
-    "Digital Experience Design",
-    "Product Engineering",
-    "Quality Engineering",
+    "sleep therapy",
+    "oxygen therapy",
+    "respiratory care",
+    "mobility equipment",
+    "diabetes supplies",
+    "wound care",
+    "specialty care",
+    "incontinence",
+    "ostomy",
+    "urology",
 ]
 
-# Matches common ways a user asks for the services list
+# Matches common ways a user asks for AdaptHealth's products/services overview
 _SERVICE_OVERVIEW_RE = re.compile(
-    r"\b("
-    r"what services|which services|list (your |the )?services|"
-    r"services (do you|does word.{0,10}brown|you) offer|"
-    r"what do you offer|what (can|does) word.{0,10}brown (do|offer|help)|"
-    r"(your |the )?services (you |word.{0,10}brown )?(provide|have)|"
-    r"tell me (about )?(your |the )?services|"
-    r"overview of (your |the )?services|"
-    r"what insurance|which insurance|insurance (do you|you) offer"
-    r")\b",
-    re.IGNORECASE,
+    r"""
+    (?:what|which|list|tell\s+me\s+about)\s+
+    (?:are\s+(?:your|the)|do\s+you\s+offer|does\s+adapt.{0,10}health\s+offer)?
+    \s*(?:services?|products?|equipment|solutions?|offerings?)
+    |what\s+do\s+you\s+(?:offer|provide|do|supply)
+    |what\s+can\s+adapt.{0,10}health\s+(?:help|do|offer|provide)
+    |(?:home\s+medical|dme|hme)\s+(?:equipment|supplies?)
+    |tell\s+me\s+about\s+adapt.{0,10}health
+    |what\s+is\s+adapt.{0,10}health
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -47,53 +53,127 @@ def _is_service_overview(question: str) -> bool:
     return bool(_SERVICE_OVERVIEW_RE.search(question))
 
 
-# Maps canonical service name substrings → URL slug fragment.
-# Used to boost retrieval precision when a rewrite query names a specific service.
-_SERVICE_SLUG_MAP: list[tuple[str, str]] = [
-    ("small group",           "products"),
-    ("large group",           "products"),
-    ("ancillary",             "products"),
-    ("individual",            "products"),
-    ("family plan",           "products"),
-    ("peo",                   "products"),
-    ("professional employer", "products"),
-    ("dental",                "products"),
-    ("vision",                "products"),
-    ("life insurance",        "products"),
-    ("supplemental",          "products"),
-    ("quoting",               "broker-resources"),
-    ("enrollment",            "broker-resources"),
-    ("broker resource",       "broker-resources"),
-    ("broker tool",           "broker-resources"),
-    ("carrier",               "carriers-products"),
-    ("product",               "products"),
-    ("newsroom",              "newsroom"),
-    ("news",                  "newsroom"),
-    ("compliance",            "newsroom"),
-    ("partner",               "partners"),
-    ("contact",               "contact"),
-    ("reach out",             "contact"),
-    ("get in touch",          "contact"),
-    ("phone",                 "contact"),
-    ("email",                 "contact"),
-    ("office",                "contact"),
-    ("location",              "contact"),
-    ("leadership",            "about/executive-team"),
-    ("leaders",               "about/executive-team"),
-    ("executive",             "about/executive-team"),
-    ("team members",          "about/executive-team"),
-    ("who is",                "about/executive-team"),
-    ("about",                 "about"),
-    ("getting started",       "about/getting-started"),
-    ("careers",               "careers"),
-    ("jobs",                  "careers"),
-]
+# Maps user query substrings → URL slug fragment (AdaptHealth pages).
+# Longer/more-specific keys are listed first so they match before shorter
+# substrings (e.g. "sleep apnea" before "sleep").
+# Used to boost retrieval precision when a rewrite query names a specific page.
+_SERVICE_SLUG_MAP: dict[str, str] = {
+    # Sleep / CPAP / PAP
+    "sleep apnea":            "pages/sleep-apnea",
+    "sleep therapy":          "pages/sleep-apnea",
+    "cpap":                   "pages/sleep-apnea",
+    "bipap":                  "pages/sleep-apnea",
+    "apap":                   "pages/sleep-apnea",
+    "pap therapy":            "pages/sleep-apnea",
+    "pap reorder":            "pages/pap-reorder",
+    "cpap supplies":          "pages/pap-reorder",
+    "pap cleaning":           "pages/pap-cleaning-schedule",
+    "sleep products":         "pages/sleep-products-support",
+    "sleep support":          "pages/sleep-products-support",
+    "sleep health":           "pages/sleep-health",
+    "sleep success":          "pages/sleep-success",
+    # Oxygen
+    "oxygen therapy":         "pages/oxygen-therapy",
+    "home oxygen":            "pages/oxygen-therapy",
+    "supplemental oxygen":    "pages/oxygen-therapy",
+    "oxygen":                 "pages/oxygen-therapy",
+    # Respiratory
+    "respiratory care":       "pages/respiratory-care",
+    "ventilator":             "pages/respiratory-care",
+    "nebulizer":              "pages/respiratory-care",
+    "respiratory":            "pages/respiratory-care",
+    # Mobility
+    "mobility":               "pages/mobility-home-equipment",
+    "wheelchair":             "pages/mobility-home-equipment",
+    "scooter":                "pages/mobility-home-equipment",
+    "walker":                 "pages/mobility-home-equipment",
+    "crutches":               "pages/mobility-home-equipment",
+    "hospital bed":           "pages/mobility-home-equipment",
+    "home equipment":         "pages/mobility-home-equipment",
+    # Diabetes
+    "diabetes supplies":      "pages/diabetes-express-reorder",
+    "glucose":                "pages/diabetes-express-reorder",
+    "cgm":                    "pages/diabetes-express-reorder",
+    "diabetes":               "pages/diabetes-express-reorder",
+    # Specialty / Other products
+    "wound care":             "pages/wound-care",
+    "wound":                  "pages/wound-care",
+    "ostomy":                 "pages/ostomy",
+    "urological":             "pages/urology",
+    "urology":                "pages/urology",
+    "incontinence":           "pages/incontinence",
+    "specialty care":         "pages/specialty-care",
+    "rehabilitation":         "pages/adaptrehab",
+    "rehab":                  "pages/adaptrehab",
+    "wellness":               "pages/wellness-at-home",
+    # Ordering / Patient tools
+    "express reorder":        "pages/express-reorder",
+    "order supplies":         "pages/express-reorder",
+    "reorder":                "pages/express-reorder",
+    "new patient":            "pages/new-patient-packet",
+    "getting started":        "pages/new-patient-packet",
+    "patient welcome":        "pages/patient-welcome-guide",
+    "app tutorial":           "pages/myapp-tutorials",
+    "my app":                 "pages/myapp",
+    "mobile app":             "pages/myapp",
+    "myapp":                  "pages/myapp",
+    "electronic prescription": "pages/eprescribe",
+    "e-prescribe":            "pages/eprescribe",
+    "eprescribe":             "pages/eprescribe",
+    "pay bill":               "pages/pay-your-bill",
+    "billing":                "pages/pay-your-bill",
+    "insurance card":         "pages/insurance-card",
+    # Insurance / Payers
+    "insurance companies":    "pages/insurance-companies",
+    "accepted insurance":     "pages/insurance-companies",
+    "insurance":              "pages/insurance-companies",
+    "humana":                 "pages/humana",
+    "kaiser":                 "pages/kaiser",
+    # Partners / Equipment brands
+    "philips recall":         "pages/philipsrecall",
+    "respironics recall":     "pages/philipsrecall",
+    "philips":                "pages/philips-respironics",
+    "resmed":                 "pages/resmed",
+    "fisher paykel":          "pages/fisher-paykel",
+    "react health":           "pages/react-health",
+    "solara":                 "pages/solara",
+    # Contact / Locations
+    "contact us":             "pages/contact-us",
+    "sleep team":             "pages/contact-sleep-team",
+    "find a location":        "pages/locations",
+    "locations":              "pages/locations",
+    "minnesota":              "pages/minnesota",
+    "new england":            "pages/newengland",
+    "contact":                "pages/contact-us",
+    # About / Corporate
+    "about adapthealth":      "pages/about-us",
+    "mission":                "pages/mission-vision-values",
+    "vision":                 "pages/mission-vision-values",
+    "values":                 "pages/mission-vision-values",
+    "accreditation":          "pages/accreditation",
+    "compliance":             "pages/corporate-compliance",
+    "leadership":             "pages/leadership-team",
+    "executives":             "pages/leadership-team",
+    "team":                   "pages/leadership-team",
+    "careers":                "pages/careers",
+    "jobs":                   "pages/careers",
+    "sustainability":         "pages/esg-overview",
+    "esg":                    "pages/esg-overview",
+    "about":                  "pages/about-us",
+    # Investor relations
+    "investor relations":     "pages/investor-relations",
+    "investors":              "pages/investor-relations",
+    "investor":               "pages/investor-relations",
+    "stock":                  "pages/stock-information",
+    "financials":             "pages/financials",
+    "governance":             "pages/governance",
+}
 
 
 def _service_slug_for_query(query: str) -> str | None:
-    """Return the URL slug if the query clearly names one specific service."""
+    """Return the URL slug if the query clearly names one specific page."""
     lower = query.lower()
-    for name, slug in _SERVICE_SLUG_MAP:
+    for name, slug in _SERVICE_SLUG_MAP.items():
         if name in lower:
             return slug
     return None
